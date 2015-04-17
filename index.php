@@ -80,7 +80,7 @@ if (isset($_POST['tag']) && $_POST['tag'] != '') {
         $encrypted_password = $hash["encrypted"]; // encrypted password
         $salt = $hash["salt"];
 		$subject = "Change Password Notification";
-        $message = "Hello User,\n\nYour Password is successfully changed.\n\nRegards,\nAdmistration";
+        $message = "Hello User,\n\nYour Password is sucessfully changed.\n\nRegards,\nAdmistration";
         $from = "qhubbandroid@gmail.com";
         $headers = "From:" . $from;
 		if ($db->isUserExisted($email)) {
@@ -126,7 +126,7 @@ if (isset($_POST['tag']) && $_POST['tag'] != '') {
 		$encrypted_password = $hash["encrypted"]; // encrypted password
 		$salt = $hash["salt"];
 		$subject = "Password Recovery";
-		$message = "Hello User,\n\nYour Password is successfully changed. Your new Password is $randomcode . Login with your new Password and change it in the User Panel.\n\nRegards,\nAdministration";
+		$message = "Hello User,\n\nYour Password is sucessfully changed. Your new Password is $randomcode . Login with your new Password and change it in the User Panel.\n\nRegards,\nAdministration";
 		$from = "qhubbandroid@gmail.com";
 		$headers = "From:" . $from;
 		if ($db->isUserExisted($forgotpassword)) {
@@ -171,7 +171,7 @@ if (isset($_POST['tag']) && $_POST['tag'] != '') {
         $password = $_POST['password'];
         
         $subject = "Registration";
-        $message = "Hello $fname,\n\nYou have successfully registered to our service.\n\nRegards,\nAdmin.";
+        $message = "Hello $fname,\n\nYou have sucessfully registered to our service.\n\nRegards,\nAdmin.";
         $from = "qhubbandroid@gmail.com";
         $headers = "From:" . $from;
 
