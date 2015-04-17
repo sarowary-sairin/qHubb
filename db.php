@@ -1,231 +1,216 @@
 <?php
+if (isset($_POST['tag']) && $_POST['tag'] != '') {
+    // Get tag
+    $tag = $_POST['tag'];
 
-class DBHelper {
-
-    //put your code here
-    // constructor
-    function __construct() {
+    // Include Database handler
+    require_once 'db.php';	    
+	require_once 'PHPMailerAutoload.php';
+	$db = new DBHelper();
 	
-		require_once 'config.php';
-        // connecting to mysql
-		
-        mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
-        
-		// selecting database
-        mysql_select_db(DB_DATABASE);
-    }
+    // response Array
+    $response = array("tag" => $tag, "success" => 0, "error" => 0);
 
-    // destructor
-    function __destruct() {
-        
-    }
+    // check for tag type
+    if ($tag == 'login') {
+        // Request type is check Login
+        $email = $_POST['email'];
+        $password = $_POST['password'];
 
-
-    /**
-     * Random string which is sent by mail to reset password
-    */
-	public function random_string()
-	{
-		$character_set_array = array();
-		$character_set_array[] = array('count' => 7, 'characters' => 'abcdefghijklmnopqrstuvwxyz');
-		$character_set_array[] = array('count' => 1, 'characters' => '0123456789');
-		$temp_array = array();
-		foreach ($character_set_array as $character_set) {
-			for ($i = 0; $i < $character_set['count']; $i++) {
-				$temp_array[] = $character_set['characters'][rand(0, strlen($character_set['characters']) - 1)];
-			}
-		}
-		shuffle($temp_array);
-		return implode('', $temp_array);
-	}
-	
-	public function deactivate($email){
-		$result = mysql_query("UPDATE `users` SET `deactive` = '1' WHERE `email` = '$email'");
-
-		if ($result) {	 
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	
-	public function activate($email){
-		$result = mysql_query("UPDATE `users` SET `deactive` = null WHERE `email` = '$email'");
-
-		if ($result) {	 
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-
-	public function forgotPassword($forgotpassword, $newpassword, $salt){
-		$result = mysql_query("UPDATE `users` SET `encrypted_password` = '$newpassword',`salt` = '$salt' 
-							  WHERE `email` = '$forgotpassword'");
-
-		if ($result) {	 
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	/**
-     * Adding new user to mysql database
-     * returns user details
-     */
-
-    public function storeUser($fname, $lname, $email, $password) {
-        $hash = $this->hashSSHA($password);
-        $encrypted_password = $hash["encrypted"]; // encrypted password
-        $salt = $hash["salt"]; // salt
-        $result = mysql_query("INSERT INTO users(firstname, lastname, email, encrypted_password, salt, created_at) VALUES('$fname', '$lname', '$email', '$encrypted_password', '$salt', NOW())");
-        // check for successful store
-        if ($result) {
-            // get user details 
-            $uid = mysql_insert_id(); // last inserted id
-            $result = mysql_query("SELECT * FROM users WHERE uid = $uid");
-            // return user details
-            return mysql_fetch_array($result);
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Verifies user by email and password
-     */
-    public function getUserByEmailAndPassword($email, $password) {
-        $result = mysql_query("SELECT * FROM users WHERE email = '$email'") or die(mysql_error());
-        // check for result 
-        $no_of_rows = mysql_num_rows($result);
-        if ($no_of_rows > 0) {
-            $result = mysql_fetch_array($result);
-            $salt = $result['salt'];
-            $encrypted_password = $result['encrypted_password'];
-            $hash = $this->checkhashSSHA($salt, $password);
-            // check for password equality
-            if ($encrypted_password == $hash) {
-                // user authentication details are correct
-                return $result;
-            }
+        // check for user
+        $user = $db->getUserByEmailAndPassword($email, $password);
+        if ($user != false) {
+            // user found
+			
+			// echo json with success = 1
+			$response["success"] = 1;
+			$response["user"]["fname"] = $user["firstname"];
+			$response["user"]["lname"] = $user["lastname"];
+			$response["user"]["email"] = $user["email"];
+			$response["user"]["deactive"] = $user["deactive"];
+			$response["user"]["created_at"] = $user["created_at"];
+			
+			echo json_encode($response);
+			
         } else {
             // user not found
-            return false;
+            // echo json with error = 1
+            $response["error"] = 1;
+            $response["error_msg"] = "Email or password incorrect!";
+            echo json_encode($response);
         }
-    }
+    } 
+	else if ($tag == 'deactivate') {
+        // Request type is deactivate
+        $email = $_POST['email'];
 
-	/**
-     * Checks whether the email is valid or fake
-     */
-	public function validEmail($email)
-	{
-	   $isValid = true;
-	   $atIndex = strrpos($email, "@");
-	   if (is_bool($atIndex) && !$atIndex)
-	   {
-		  $isValid = false;
-	   }
-	   else
-	   {
-		  $domain = substr($email, $atIndex+1);
-		  $local = substr($email, 0, $atIndex);
-		  $localLen = strlen($local);
-		  $domainLen = strlen($domain);
-		  if ($localLen < 1 || $localLen > 64)
-		  {
-			 // local part length exceeded
-			 $isValid = false;
-		  }
-		  else if ($domainLen < 1 || $domainLen > 255)
-		  {
-			 // domain part length exceeded
-			 $isValid = false;
-		  }
-		  else if ($local[0] == '.' || $local[$localLen-1] == '.')
-		  {
-			 // local part starts or ends with '.'
-			 $isValid = false;
-		  }
-		  else if (preg_match('/\\.\\./', $local))
-		  {
-			 // local part has two consecutive dots
-			 $isValid = false;
-		  }
-		  else if (!preg_match('/^[A-Za-z0-9\\-\\.]+$/', $domain))
-		  {
-			 // character not valid in domain part
-			 $isValid = false;
-		  }
-		  else if (preg_match('/\\.\\./', $domain))
-		  {
-			 // domain part has two consecutive dots
-			 $isValid = false;
-		  }
-		  else if (!preg_match('/^(\\\\.|[A-Za-z0-9!#%&`_=\\/$\'*+?^{}|~.-])+$/',
-					 str_replace("\\\\","",$local)))
-		  {
-			 // character not valid in local part unless 
-			 // local part is quoted
-			 if (!preg_match('/^"(\\\\"|[^"])+"$/',
-				 str_replace("\\\\","",$local)))
-			 {
-				$isValid = false;
-			 }
-		  }
-		  if ($isValid && !(checkdnsrr($domain,"MX") || checkdnsrr($domain,"A")))
-		  {
-			 // domain not found in DNS
-			 $isValid = false;
-		  }
-	   }
-	   return $isValid;
-	}
-
-	/**
-     * Check user is existed or not
-     */
-    public function isUserExisted($email) {
-        $result = mysql_query("SELECT email from users WHERE email = '$email'");
-        $no_of_rows = mysql_num_rows($result);
-        if ($no_of_rows > 0) {
-            // user existed 
-            return true;
+        // check for user
+        $user = $db->deactivate($email);
+        if ($user != false) {
+            // echo json with success = 1
+            $response["success"] = 1;            
+            echo json_encode($response);
         } else {
-            // user not existed
-            return false;
+            // echo json with error = 1
+            $response["error"] = 1;
+            echo json_encode($response);
         }
+    } 
+	else if ($tag == 'activate') {
+        // Request type is deactivate
+        $email = $_POST['email'];
+
+        // check for user
+        $user = $db->activate($email);
+        if ($user != false) {
+            // echo json with success = 1
+            $response["success"] = 1;            
+            echo json_encode($response);
+        } else {
+            // echo json with error = 1
+            $response["error"] = 1;
+            echo json_encode($response);
+        }
+    } 
+	else if ($tag == 'chgpass'){
+		$email = $_POST['email'];
+		$newpassword = $_POST['newpas'];  
+
+		$hash = $db->hashSSHA($newpassword);
+        $encrypted_password = $hash["encrypted"]; // encrypted password
+        $salt = $hash["salt"];
+		$subject = "Change Password Notification";
+        $message = "Hello User,\n\nYour Password is sucessfully changed.\n\nRegards,\nAdmistration";
+        $from = "qhubbandroid@gmail.com";
+        $headers = "From:" . $from;
+		if ($db->isUserExisted($email)) {
+			$user = $db->forgotPassword($email, $encrypted_password, $salt);
+			if ($user) {
+				$mail = new PHPMailer();
+				$mail->IsSMTP();
+				$mail->SMTPAuth = true; 
+				
+				$mail->SMTPSecure = 'ssl'; 
+				$mail->Host = 'smtp.gmail.com';
+				$mail->Port = 465;  
+				$mail->Username = $from;  
+				$mail->Password = "qhubbapp";   
+					
+				$mail->SetFrom($from, $from);
+				$mail->Subject = $subject;
+				$mail->Body = $message;
+				$mail->AddAddress($email);
+				if(!$mail->Send()) {
+					$response["error"] = 1;
+					echo json_encode($response);	
+				} else {
+					$response["success"] = 1;
+					echo json_encode($response);
+				}
+			}
+			else {
+				$response["error"] = 1;
+				echo json_encode($response);
+			}
+            // user is already existed - error response
+		} else {
+			$response["error"] = 2;
+            $response["error_msg"] = "User not exist";
+            echo json_encode($response);
+		}
+	}else if ($tag == 'forpass'){	
+		
+		$forgotpassword = $_POST['forgotpassword'];
+		$randomcode = $db->random_string();
+		$hash = $db->hashSSHA($randomcode);
+		$encrypted_password = $hash["encrypted"]; // encrypted password
+		$salt = $hash["salt"];
+		$subject = "Password Recovery";
+		$message = "Hello User,\n\nYour Password is sucessfully changed. Your new Password is $randomcode . Login with your new Password and change it in the User Panel.\n\nRegards,\nAdministration";
+		$from = "qhubbandroid@gmail.com";
+		$headers = "From:" . $from;
+		if ($db->isUserExisted($forgotpassword)) {
+			$user = $db->forgotPassword($forgotpassword, $encrypted_password, $salt);
+			if ($user) {
+				$mail = new PHPMailer();
+				$mail->IsSMTP();
+				$mail->SMTPAuth = true; 
+				
+				$mail->SMTPSecure = 'ssl'; 
+				$mail->Host = 'smtp.gmail.com';
+				$mail->Port = 465;  
+				$mail->Username = $from;  
+				$mail->Password = "qhubbapp";   
+					
+				$mail->SetFrom($from, $from);
+				$mail->Subject = $subject;
+				$mail->Body = $message;
+				$mail->AddAddress($forgotpassword);
+				if(!$mail->Send()) {
+					$response["error"] = 1;
+					echo json_encode($response);	
+				} else {
+					$response["success"] = 1;
+					echo json_encode($response);
+				}
+			}else {
+				$response["error"] = 1;
+				echo json_encode($response);
+			}
+			// user is already existed - error response
+		} else {
+			$response["error"] = 2;
+			$response["error_msg"] = "User not exist";
+			echo json_encode($response);
+		}
+	}else if ($tag == 'register') {
+        // Request type is Register new user
+        $fname = $_POST['fname'];
+		$lname = $_POST['lname'];
+        $email = $_POST['email'];
+        $password = $_POST['password'];
+        
+        $subject = "Registration";
+        $message = "Hello $fname,\n\nYou have sucessfully registered to our service.\n\nRegards,\nAdmin.";
+        $from = "qhubbandroid@gmail.com";
+        $headers = "From:" . $from;
+
+        // check if user is already existed
+        if ($db->isUserExisted($email)) {
+            // user is already existed - error response
+            $response["error"] = 2;
+            $response["error_msg"] = "User already existed";
+            echo json_encode($response);
+        }else if(!$db->validEmail($email)){
+            $response["error"] = 3;
+            $response["error_msg"] = "Invalid Email Id";
+            echo json_encode($response);             
+		}else {
+            // store user
+            $user = $db->storeUser($fname, $lname, $email, $password);
+            if ($user) {
+                // user stored successfully
+				$response["success"] = 1;
+				$response["user"]["fname"] = $user["firstname"];
+				$response["user"]["lname"] = $user["lastname"];
+				$response["user"]["email"] = $user["email"];
+				$response["user"]["created_at"] = $user["created_at"];
+				mail($email,$subject,$message,$headers);
+            
+                echo json_encode($response);
+            } else {
+                // user failed to store
+                $response["error"] = 1;
+                $response["error_msg"] = "JSON Error occurred in Registration";
+                echo json_encode($response);
+            }
+        }
+    } else {
+         $response["error"] = 3;
+         $response["error_msg"] = "JSON ERROR";
+        echo json_encode($response);
     }
-
-    /**
-     * Encrypting password
-     * returns salt and encrypted password
-     */
-    public function hashSSHA($password) {
-
-        $salt = sha1(rand());
-        $salt = substr($salt, 0, 10);
-        $encrypted = base64_encode(sha1($password . $salt, true) . $salt);
-        $hash = array("salt" => $salt, "encrypted" => $encrypted);
-        return $hash;
-    }
-
-    /**
-     * Decrypting password
-     * returns hash string
-     */
-    public function checkhashSSHA($salt, $password) {
-
-        $hash = base64_encode(sha1($password . $salt, true) . $salt);
-
-        return $hash;
-    }
+} else {
+    echo "Login API";
 }
-
 ?>
-
