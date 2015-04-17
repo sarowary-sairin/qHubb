@@ -1,4 +1,4 @@
-Enter file contents here<?php
+<?php
 /**
  * PHPMailer SPL autoloader.
  * PHP Version 5
